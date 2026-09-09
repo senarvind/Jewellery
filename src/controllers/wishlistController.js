@@ -1,19 +1,17 @@
-import { Response } from "express";
-import connectToDatabase from "../config/db";
-import WishlistModel from "../models/Wishlist";
-import { AuthRequest } from "../middleware/authMiddleware";
+const connectToDatabase = require("../config/db");
+const WishlistModel = require("../models/Wishlist");
 
-function extractIdentifiers(req: AuthRequest) {
+function extractIdentifiers(req) {
   const userId = req.user?.userId;
   const sessionId =
-    (req.query.sessionId as string) ||
+    req.query.sessionId ||
     req.body?.sessionId ||
-    (req.headers["x-session-id"] as string) ||
+    req.headers["x-session-id"] ||
     undefined;
   return { userId, sessionId };
 }
 
-export async function getWishlist(req: AuthRequest, res: Response) {
+async function getWishlist(req, res) {
   try {
     const { userId, sessionId } = extractIdentifiers(req);
 
@@ -26,7 +24,7 @@ export async function getWishlist(req: AuthRequest, res: Response) {
       return res.status(500).json({ success: false, error: "Database connection unavailable" });
     }
 
-    let wishlist: any = null;
+    let wishlist = null;
     if (userId) {
       wishlist = await WishlistModel.findOne({ userId }).lean();
     }
@@ -42,7 +40,7 @@ export async function getWishlist(req: AuthRequest, res: Response) {
       id: wishlist._id ? wishlist._id.toString() : wishlist.id,
       userId: wishlist.userId,
       sessionId: wishlist.sessionId,
-      items: (wishlist.items || []).map((item: any) => ({
+      items: (wishlist.items || []).map((item) => ({
         productId: item.productId || item.product?.id || "",
         product: item.product,
       })),
@@ -50,12 +48,12 @@ export async function getWishlist(req: AuthRequest, res: Response) {
     };
 
     return res.json({ success: true, wishlist: formattedWishlist });
-  } catch (error: any) {
+  } catch (error) {
     return res.status(500).json({ success: false, error: error.message || "Failed to fetch wishlist" });
   }
 }
 
-export async function saveWishlist(req: AuthRequest, res: Response) {
+async function saveWishlist(req, res) {
   try {
     const { userId, sessionId } = extractIdentifiers(req);
     const { items } = req.body;
@@ -69,19 +67,19 @@ export async function saveWishlist(req: AuthRequest, res: Response) {
       return res.status(500).json({ success: false, error: "Database connection unavailable" });
     }
 
-    const query: Record<string, any> = {};
+    const query = {};
     if (userId) {
       query.userId = userId;
     } else {
       query.sessionId = sessionId;
     }
 
-    const cleanItems = (items || []).map((item: any) => ({
+    const cleanItems = (items || []).map((item) => ({
       productId: item.productId || item.product?.id || String(Date.now()),
       product: item.product,
     }));
 
-    const updatedWishlist: any = await WishlistModel.findOneAndUpdate(
+    const updatedWishlist = await WishlistModel.findOneAndUpdate(
       query,
       {
         $set: {
@@ -106,12 +104,12 @@ export async function saveWishlist(req: AuthRequest, res: Response) {
     };
 
     return res.json({ success: true, wishlist: formattedWishlist });
-  } catch (error: any) {
+  } catch (error) {
     return res.status(500).json({ success: false, error: error.message || "Failed to save wishlist" });
   }
 }
 
-export async function toggleWishlistItem(req: AuthRequest, res: Response) {
+async function toggleWishlistItem(req, res) {
   try {
     const { userId, sessionId } = extractIdentifiers(req);
     const { product } = req.body;
@@ -129,11 +127,11 @@ export async function toggleWishlistItem(req: AuthRequest, res: Response) {
       return res.status(500).json({ success: false, error: "Database connection unavailable" });
     }
 
-    const query: Record<string, any> = {};
+    const query = {};
     if (userId) query.userId = userId;
     else query.sessionId = sessionId;
 
-    let wishlist: any = await WishlistModel.findOne(query);
+    let wishlist = await WishlistModel.findOne(query);
     if (!wishlist) {
       wishlist = new WishlistModel({
         userId,
@@ -143,7 +141,7 @@ export async function toggleWishlistItem(req: AuthRequest, res: Response) {
       await wishlist.save();
     } else {
       const existingIndex = (wishlist.items || []).findIndex(
-        (item: any) => item.productId === product.id || item.product?.id === product.id
+        (item) => item.productId === product.id || item.product?.id === product.id
       );
 
       if (existingIndex > -1) {
@@ -160,7 +158,7 @@ export async function toggleWishlistItem(req: AuthRequest, res: Response) {
       id: wishlist._id.toString(),
       userId: wishlist.userId,
       sessionId: wishlist.sessionId,
-      items: (wishlist.items || []).map((item: any) => ({
+      items: (wishlist.items || []).map((item) => ({
         productId: item.productId || item.product?.id || "",
         product: item.product,
       })),
@@ -168,12 +166,12 @@ export async function toggleWishlistItem(req: AuthRequest, res: Response) {
     };
 
     return res.json({ success: true, wishlist: formattedWishlist });
-  } catch (error: any) {
+  } catch (error) {
     return res.status(500).json({ success: false, error: error.message || "Failed to toggle wishlist item" });
   }
 }
 
-export async function clearWishlist(req: AuthRequest, res: Response) {
+async function clearWishlist(req, res) {
   try {
     const { userId, sessionId } = extractIdentifiers(req);
 
@@ -186,14 +184,21 @@ export async function clearWishlist(req: AuthRequest, res: Response) {
       return res.status(500).json({ success: false, error: "Database connection unavailable" });
     }
 
-    const query: Record<string, any> = {};
+    const query = {};
     if (userId) query.userId = userId;
     else query.sessionId = sessionId;
 
     await WishlistModel.findOneAndUpdate(query, { $set: { items: [] } });
 
     return res.json({ success: true, message: "Wishlist cleared in database" });
-  } catch (error: any) {
+  } catch (error) {
     return res.status(500).json({ success: false, error: error.message || "Failed to clear wishlist" });
   }
 }
+
+module.exports = {
+  getWishlist,
+  saveWishlist,
+  toggleWishlistItem,
+  clearWishlist,
+};

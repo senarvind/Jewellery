@@ -1,8 +1,7 @@
-import { Request, Response } from "express";
-import connectToDatabase from "../config/db";
-import CategoryModel from "../models/Category";
+const connectToDatabase = require("../config/db");
+const CategoryModel = require("../models/Category");
 
-function toCategory(doc: any) {
+function toCategory(doc) {
   return {
     id: doc._id.toString(),
     name: doc.name,
@@ -15,7 +14,7 @@ function toCategory(doc: any) {
   };
 }
 
-export async function getAllCategories(req: Request, res: Response) {
+async function getAllCategories(req, res) {
   try {
     const conn = await connectToDatabase();
     if (!conn) {
@@ -23,12 +22,12 @@ export async function getAllCategories(req: Request, res: Response) {
     }
     const docs = await CategoryModel.find({ isActive: true }).sort({ displayOrder: 1, name: 1 }).lean();
     return res.json({ success: true, categories: docs.map(toCategory) });
-  } catch (error: any) {
+  } catch (error) {
     return res.status(500).json({ success: false, error: error.message || "Failed to fetch categories" });
   }
 }
 
-export async function getCategoryBySlug(req: Request, res: Response) {
+async function getCategoryBySlug(req, res) {
   try {
     const slug = req.params.slug;
     const conn = await connectToDatabase();
@@ -42,12 +41,12 @@ export async function getCategoryBySlug(req: Request, res: Response) {
     }
 
     return res.json({ success: true, category: toCategory(doc) });
-  } catch (error: any) {
+  } catch (error) {
     return res.status(500).json({ success: false, error: error.message || "Failed to fetch category" });
   }
 }
 
-export async function createCategory(req: Request, res: Response) {
+async function createCategory(req, res) {
   try {
     const { name, description, imageUrl, displayOrder, isActive } = req.body;
     if (!name) {
@@ -71,12 +70,12 @@ export async function createCategory(req: Request, res: Response) {
     });
 
     return res.status(201).json({ success: true, category: toCategory(newDoc) });
-  } catch (error: any) {
+  } catch (error) {
     return res.status(500).json({ success: false, error: error.message || "Failed to create category" });
   }
 }
 
-export async function updateCategory(req: Request, res: Response) {
+async function updateCategory(req, res) {
   try {
     const { id } = req.params;
     const conn = await connectToDatabase();
@@ -95,12 +94,12 @@ export async function updateCategory(req: Request, res: Response) {
     }
 
     return res.json({ success: true, category: toCategory(updated) });
-  } catch (error: any) {
+  } catch (error) {
     return res.status(500).json({ success: false, error: error.message || "Failed to update category" });
   }
 }
 
-export async function deleteCategory(req: Request, res: Response) {
+async function deleteCategory(req, res) {
   try {
     const { id } = req.params;
     const conn = await connectToDatabase();
@@ -114,7 +113,15 @@ export async function deleteCategory(req: Request, res: Response) {
     }
 
     return res.json({ success: true, message: "Category deleted successfully" });
-  } catch (error: any) {
+  } catch (error) {
     return res.status(500).json({ success: false, error: error.message || "Failed to delete category" });
   }
 }
+
+module.exports = {
+  getAllCategories,
+  getCategoryBySlug,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+};

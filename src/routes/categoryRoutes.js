@@ -1,13 +1,13 @@
-import { Router } from "express";
-import {
+const express = require("express");
+const {
   getAllCategories,
   getCategoryBySlug,
   createCategory,
   updateCategory,
   deleteCategory,
-} from "../controllers/categoryController";
+} = require("../controllers/categoryController");
 
-const router = Router();
+const router = express.Router();
 
 router.get("/", getAllCategories);
 router.get("/:slug", getCategoryBySlug);
@@ -15,4 +15,4 @@ router.post("/", createCategory);
 router.put("/:id", updateCategory);
 router.delete("/:id", deleteCategory);
 
-export default router;
+module.exports = router;

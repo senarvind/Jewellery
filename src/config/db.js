@@ -1,5 +1,5 @@
-import mongoose from "mongoose";
-import dns from "dns";
+const mongoose = require("mongoose");
+const dns = require("dns");
 
 // Fix Node.js DNS SRV lookup issues on Windows
 try {
@@ -7,13 +7,13 @@ try {
     dns.setDefaultResultOrder("ipv4first");
   }
   dns.setServers(["8.8.8.8", "1.1.1.1", "8.8.4.4", "4.2.2.2"]);
-} catch {
+} catch (e) {
   // Ignore if restricted
 }
 
 let isConnected = false;
 
-export async function connectToDatabase(): Promise<typeof mongoose | null> {
+async function connectToDatabase() {
   const MONGODB_URI = process.env.MONGODB_URI;
 
   if (!MONGODB_URI) {
@@ -42,4 +42,4 @@ export async function connectToDatabase(): Promise<typeof mongoose | null> {
   }
 }
 
-export default connectToDatabase;
+module.exports = connectToDatabase;

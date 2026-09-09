@@ -1,7 +1,7 @@
-import { Router, Request, Response } from "express";
-import multer from "multer";
-import path from "path";
-import fs from "fs";
+const express = require("express");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
 
 const uploadDir = path.join(process.cwd(), "uploads", "products");
 if (!fs.existsSync(uploadDir)) {
@@ -27,9 +27,9 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
 });
 
-const router = Router();
+const router = express.Router();
 
-router.post("/", upload.single("file"), (req: Request, res: Response) => {
+router.post("/", upload.single("file"), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, error: "No file uploaded" });
@@ -42,9 +42,9 @@ router.post("/", upload.single("file"), (req: Request, res: Response) => {
       url: publicUrl,
       fileName: req.file.filename,
     });
-  } catch (error: any) {
+  } catch (error) {
     return res.status(500).json({ success: false, error: error.message || "Upload failed" });
   }
 });
 
-export default router;
+module.exports = router;

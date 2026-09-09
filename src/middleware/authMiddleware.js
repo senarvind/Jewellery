@@ -1,29 +1,20 @@
-import { Request, Response, NextFunction } from "express";
-import jwt from "jsonwebtoken";
+const jwt = require("jsonwebtoken");
 
 const JWT_SECRET = process.env.JWT_SECRET || "keshar_jewellers_jwt_secret_key_2026";
 
-export interface AuthRequest extends Request {
-  user?: {
-    userId: string;
-    email: string;
-    role: string;
-  };
-}
-
-export function generateToken(payload: { userId: string; email: string; role: string }): string {
+function generateToken(payload) {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
 }
 
-export function verifyToken(token: string): { userId: string; email: string; role: string } | null {
+function verifyToken(token) {
   try {
-    return jwt.verify(token, JWT_SECRET) as { userId: string; email: string; role: string };
-  } catch {
+    return jwt.verify(token, JWT_SECRET);
+  } catch (err) {
     return null;
   }
 }
 
-export function authenticateToken(req: AuthRequest, res: Response, next: NextFunction) {
+function authenticateToken(req, res, next) {
   const authHeader = req.headers["authorization"];
   let token = authHeader && authHeader.split(" ")[1];
 
@@ -44,7 +35,7 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
   next();
 }
 
-export function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
+function requireAuth(req, res, next) {
   authenticateToken(req, res, () => {
     if (!req.user) {
       return res.status(401).json({ success: false, error: "Authentication required" });
@@ -53,7 +44,7 @@ export function requireAuth(req: AuthRequest, res: Response, next: NextFunction)
   });
 }
 
-export function requireAdmin(req: AuthRequest, res: Response, next: NextFunction) {
+function requireAdmin(req, res, next) {
   authenticateToken(req, res, () => {
     if (!req.user || req.user.role !== "admin") {
       return res.status(403).json({ success: false, error: "Admin access required" });
@@ -61,3 +52,11 @@ export function requireAdmin(req: AuthRequest, res: Response, next: NextFunction
     next();
   });
 }
+
+module.exports = {
+  generateToken,
+  verifyToken,
+  authenticateToken,
+  requireAuth,
+  requireAdmin,
+};

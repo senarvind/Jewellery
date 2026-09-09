@@ -1,27 +1,8 @@
-import { Request, Response } from "express";
-import mongoose from "mongoose";
-import connectToDatabase from "../config/db";
-import ProductModel from "../models/Product";
+const mongoose = require("mongoose");
+const connectToDatabase = require("../config/db");
+const ProductModel = require("../models/Product");
 
-export interface Product {
-  id: string;
-  category: string;
-  productType: string;
-  description: string;
-  material: string;
-  dimensionL?: string;
-  dimensionW?: string;
-  dimensionH?: string;
-  weight: string;
-  sellingPrice: number;
-  mrp: number;
-  frontImage?: string;
-  backImage?: string;
-  modelImage?: string;
-  createdAt?: string;
-}
-
-export const SAMPLE_PRODUCTS: Product[] = [
+const SAMPLE_PRODUCTS = [
   {
     id: "sample-ring-1",
     category: "rings",
@@ -109,7 +90,7 @@ export const SAMPLE_PRODUCTS: Product[] = [
   },
 ];
 
-function toProduct(doc: any): Product {
+function toProduct(doc) {
   return {
     id: doc._id ? doc._id.toString() : doc.id,
     category: doc.category,
@@ -129,28 +110,28 @@ function toProduct(doc: any): Product {
   };
 }
 
-export async function getAllProducts(req: Request, res: Response) {
+async function getAllProducts(req, res) {
   try {
     const conn = await connectToDatabase();
-    let dbProducts: Product[] = [];
+    let dbProducts = [];
     if (conn) {
       const docs = await ProductModel.find({}).sort({ createdAt: -1 }).lean();
       dbProducts = docs.map(toProduct);
     }
     const combined = [...dbProducts, ...SAMPLE_PRODUCTS];
     return res.json({ success: true, count: combined.length, products: combined });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error in getAllProducts:", error);
     return res.json({ success: true, count: SAMPLE_PRODUCTS.length, products: SAMPLE_PRODUCTS });
   }
 }
 
-export async function getProductsByCategory(req: Request, res: Response) {
+async function getProductsByCategory(req, res) {
   try {
-    const categorySlug = (req.params.slug || (req.query.category as string) || "").toString();
+    const categorySlug = (req.params.slug || req.query.category || "").toString();
     const normalizedSlug = categorySlug.toLowerCase().trim().replace(/s$/, "");
     const conn = await connectToDatabase();
-    let dbProducts: Product[] = [];
+    let dbProducts = [];
 
     if (conn && categorySlug) {
       const docs = await ProductModel.find({
@@ -172,13 +153,13 @@ export async function getProductsByCategory(req: Request, res: Response) {
       count: combined.length,
       products: combined.length > 0 ? combined : SAMPLE_PRODUCTS,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error in getProductsByCategory:", error);
     return res.json({ success: true, count: SAMPLE_PRODUCTS.length, products: SAMPLE_PRODUCTS });
   }
 }
 
-export async function getProductById(req: Request, res: Response) {
+async function getProductById(req, res) {
   try {
     const { id } = req.params;
     const conn = await connectToDatabase();
@@ -196,13 +177,13 @@ export async function getProductById(req: Request, res: Response) {
     }
 
     return res.json({ success: true, product: SAMPLE_PRODUCTS[0] });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error in getProductById:", error);
     return res.json({ success: true, product: SAMPLE_PRODUCTS[0] });
   }
 }
 
-export async function createProduct(req: Request, res: Response) {
+async function createProduct(req, res) {
   try {
     const conn = await connectToDatabase();
     if (!conn) {
@@ -217,12 +198,12 @@ export async function createProduct(req: Request, res: Response) {
       message: "Product created successfully! 💎",
       product: toProduct(newDoc),
     });
-  } catch (error: any) {
+  } catch (error) {
     return res.status(500).json({ success: false, error: error.message || "Failed to create product" });
   }
 }
 
-export async function updateProduct(req: Request, res: Response) {
+async function updateProduct(req, res) {
   try {
     const { id } = req.params;
     const conn = await connectToDatabase();
@@ -244,14 +225,14 @@ export async function updateProduct(req: Request, res: Response) {
       message: "Product updated successfully! ✨",
       product: toProduct(updatedDoc),
     });
-  } catch (error: any) {
+  } catch (error) {
     return res.status(500).json({ success: false, error: error.message || "Failed to update product" });
   }
 }
 
-export async function deleteProduct(req: Request, res: Response) {
+async function deleteProduct(req, res) {
   try {
-    const id = req.params.id || (req.query.id as string);
+    const id = req.params.id || req.query.id;
     if (!id) {
       return res.status(400).json({ success: false, error: "Product ID is required" });
     }
@@ -267,12 +248,12 @@ export async function deleteProduct(req: Request, res: Response) {
     }
 
     return res.json({ success: true, message: "Product deleted successfully" });
-  } catch (error: any) {
+  } catch (error) {
     return res.status(500).json({ success: false, error: error.message || "Failed to delete product" });
   }
 }
 
-export async function bulkCreateProducts(req: Request, res: Response) {
+async function bulkCreateProducts(req, res) {
   try {
     const { products } = req.body;
     if (!Array.isArray(products) || products.length === 0) {
@@ -284,7 +265,7 @@ export async function bulkCreateProducts(req: Request, res: Response) {
       return res.status(500).json({ success: false, error: "Database connection unavailable" });
     }
 
-    const cleaned = products.map(({ id, ...rest }: any) => rest);
+    const cleaned = products.map(({ id, ...rest }) => rest);
     const result = await ProductModel.insertMany(cleaned);
 
     return res.status(201).json({
@@ -292,7 +273,18 @@ export async function bulkCreateProducts(req: Request, res: Response) {
       message: `Successfully imported ${result.length} products! 💎`,
       count: result.length,
     });
-  } catch (error: any) {
+  } catch (error) {
     return res.status(500).json({ success: false, error: error.message || "Failed to import products" });
   }
 }
+
+module.exports = {
+  SAMPLE_PRODUCTS,
+  getAllProducts,
+  getProductsByCategory,
+  getProductById,
+  createProduct,
+  updateProduct,
+  deleteProduct,
+  bulkCreateProducts,
+};

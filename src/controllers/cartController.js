@@ -1,19 +1,17 @@
-import { Response } from "express";
-import connectToDatabase from "../config/db";
-import CartModel from "../models/Cart";
-import { AuthRequest } from "../middleware/authMiddleware";
+const connectToDatabase = require("../config/db");
+const CartModel = require("../models/Cart");
 
-function extractIdentifiers(req: AuthRequest) {
+function extractIdentifiers(req) {
   const userId = req.user?.userId;
   const sessionId =
-    (req.query.sessionId as string) ||
+    req.query.sessionId ||
     req.body?.sessionId ||
-    (req.headers["x-session-id"] as string) ||
+    req.headers["x-session-id"] ||
     undefined;
   return { userId, sessionId };
 }
 
-export async function getCart(req: AuthRequest, res: Response) {
+async function getCart(req, res) {
   try {
     const { userId, sessionId } = extractIdentifiers(req);
 
@@ -26,7 +24,7 @@ export async function getCart(req: AuthRequest, res: Response) {
       return res.status(500).json({ success: false, error: "Database connection unavailable" });
     }
 
-    let cart: any = null;
+    let cart = null;
     if (userId) {
       cart = await CartModel.findOne({ userId }).lean();
     }
@@ -42,7 +40,7 @@ export async function getCart(req: AuthRequest, res: Response) {
       id: cart._id ? cart._id.toString() : cart.id,
       userId: cart.userId,
       sessionId: cart.sessionId,
-      items: (cart.items || []).map((item: any) => ({
+      items: (cart.items || []).map((item) => ({
         productId: item.productId || item.product?.id || "",
         product: item.product,
         quantity: item.quantity || 1,
@@ -51,12 +49,12 @@ export async function getCart(req: AuthRequest, res: Response) {
     };
 
     return res.json({ success: true, cart: formattedCart });
-  } catch (error: any) {
+  } catch (error) {
     return res.status(500).json({ success: false, error: error.message || "Failed to fetch cart" });
   }
 }
 
-export async function saveCart(req: AuthRequest, res: Response) {
+async function saveCart(req, res) {
   try {
     const { userId, sessionId } = extractIdentifiers(req);
     const { items } = req.body;
@@ -70,20 +68,20 @@ export async function saveCart(req: AuthRequest, res: Response) {
       return res.status(500).json({ success: false, error: "Database connection unavailable" });
     }
 
-    const query: Record<string, any> = {};
+    const query = {};
     if (userId) {
       query.userId = userId;
     } else {
       query.sessionId = sessionId;
     }
 
-    const cleanItems = (items || []).map((item: any) => ({
+    const cleanItems = (items || []).map((item) => ({
       productId: item.productId || item.product?.id || String(Date.now()),
       product: item.product,
       quantity: Math.max(1, item.quantity || 1),
     }));
 
-    const updatedCart: any = await CartModel.findOneAndUpdate(
+    const updatedCart = await CartModel.findOneAndUpdate(
       query,
       {
         $set: {
@@ -108,12 +106,12 @@ export async function saveCart(req: AuthRequest, res: Response) {
     };
 
     return res.json({ success: true, cart: formattedCart });
-  } catch (error: any) {
+  } catch (error) {
     return res.status(500).json({ success: false, error: error.message || "Failed to save cart" });
   }
 }
 
-export async function clearCart(req: AuthRequest, res: Response) {
+async function clearCart(req, res) {
   try {
     const { userId, sessionId } = extractIdentifiers(req);
 
@@ -126,14 +124,20 @@ export async function clearCart(req: AuthRequest, res: Response) {
       return res.status(500).json({ success: false, error: "Database connection unavailable" });
     }
 
-    const query: Record<string, any> = {};
+    const query = {};
     if (userId) query.userId = userId;
     else query.sessionId = sessionId;
 
     await CartModel.findOneAndUpdate(query, { $set: { items: [] } });
 
     return res.json({ success: true, message: "Cart cleared in database" });
-  } catch (error: any) {
+  } catch (error) {
     return res.status(500).json({ success: false, error: error.message || "Failed to clear cart" });
   }
 }
+
+module.exports = {
+  getCart,
+  saveCart,
+  clearCart,
+};

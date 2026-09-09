@@ -1,20 +1,9 @@
-import { Request, Response } from "express";
-import connectToDatabase from "../config/db";
-import UserModel from "../models/User";
-import bcrypt from "bcryptjs";
-import { generateToken, verifyToken, AuthRequest } from "../middleware/authMiddleware";
+const connectToDatabase = require("../config/db");
+const UserModel = require("../models/User");
+const bcrypt = require("bcryptjs");
+const { generateToken, verifyToken } = require("../middleware/authMiddleware");
 
-export interface UserResponse {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  role: "user" | "admin";
-  token?: string;
-  createdAt?: string;
-}
-
-function sanitizeUser(user: any, token?: string): UserResponse {
+function sanitizeUser(user, token) {
   return {
     id: user._id ? user._id.toString() : user.id,
     name: user.name,
@@ -26,7 +15,7 @@ function sanitizeUser(user: any, token?: string): UserResponse {
   };
 }
 
-export async function register(req: Request, res: Response) {
+async function register(req, res) {
   try {
     const { name, email, password, phone } = req.body;
     if (!name || !email || !password) {
@@ -51,7 +40,7 @@ export async function register(req: Request, res: Response) {
       name: name.trim(),
       email: emailNormalized,
       password: hashedPassword,
-      phone: phone?.trim() || "",
+      phone: phone ? phone.trim() : "",
       role: "user",
     });
 
@@ -66,12 +55,12 @@ export async function register(req: Request, res: Response) {
       message: "User registered successfully! 💎",
       user: sanitizeUser(newUser, token),
     });
-  } catch (error: any) {
+  } catch (error) {
     return res.status(500).json({ success: false, error: error.message || "Registration failed" });
   }
 }
 
-export async function login(req: Request, res: Response) {
+async function login(req, res) {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
@@ -105,16 +94,16 @@ export async function login(req: Request, res: Response) {
       message: "Logged in successfully! 💎",
       user: sanitizeUser(user, token),
     });
-  } catch (error: any) {
+  } catch (error) {
     return res.status(500).json({ success: false, error: error.message || "Login failed" });
   }
 }
 
-export async function getMe(req: AuthRequest, res: Response) {
+async function getMe(req, res) {
   try {
     const authHeader = req.headers.authorization;
-    let token = authHeader?.replace("Bearer ", "");
-    if (!token && req.cookies?.token) {
+    let token = authHeader ? authHeader.replace("Bearer ", "") : undefined;
+    if (!token && req.cookies && req.cookies.token) {
       token = req.cookies.token;
     }
 
@@ -138,20 +127,20 @@ export async function getMe(req: AuthRequest, res: Response) {
     }
 
     return res.json({ success: true, user: sanitizeUser(user) });
-  } catch (error: any) {
+  } catch (error) {
     return res.status(500).json({ success: false, error: error.message || "Authentication error" });
   }
 }
 
-export async function logout(req: Request, res: Response) {
+async function logout(req, res) {
   return res.json({ success: true, message: "Logged out successfully" });
 }
 
-export async function updateProfile(req: AuthRequest, res: Response) {
+async function updateProfile(req, res) {
   try {
     const authHeader = req.headers.authorization;
-    let token = authHeader?.replace("Bearer ", "");
-    if (!token && req.cookies?.token) {
+    let token = authHeader ? authHeader.replace("Bearer ", "") : undefined;
+    if (!token && req.cookies && req.cookies.token) {
       token = req.cookies.token;
     }
 
@@ -210,7 +199,15 @@ export async function updateProfile(req: AuthRequest, res: Response) {
       message: "Profile updated successfully! ✨",
       user: sanitizeUser(user, newToken),
     });
-  } catch (error: any) {
+  } catch (error) {
     return res.status(500).json({ success: false, error: error.message || "Failed to update profile" });
   }
 }
+
+module.exports = {
+  register,
+  login,
+  getMe,
+  logout,
+  updateProfile,
+};

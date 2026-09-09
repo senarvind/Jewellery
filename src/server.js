@@ -1,16 +1,16 @@
-import express from "express";
-import cors from "cors";
-import dotenv from "dotenv";
-import path from "path";
-import connectToDatabase from "./config/db";
+const express = require("express");
+const cors = require("cors");
+const dotenv = require("dotenv");
+const path = require("path");
+const connectToDatabase = require("./config/db");
 
-import healthRoutes from "./routes/healthRoutes";
-import authRoutes from "./routes/authRoutes";
-import productRoutes from "./routes/productRoutes";
-import categoryRoutes from "./routes/categoryRoutes";
-import cartRoutes from "./routes/cartRoutes";
-import wishlistRoutes from "./routes/wishlistRoutes";
-import uploadRoutes from "./routes/uploadRoutes";
+const healthRoutes = require("./routes/healthRoutes");
+const authRoutes = require("./routes/authRoutes");
+const productRoutes = require("./routes/productRoutes");
+const categoryRoutes = require("./routes/categoryRoutes");
+const cartRoutes = require("./routes/cartRoutes");
+const wishlistRoutes = require("./routes/wishlistRoutes");
+const uploadRoutes = require("./routes/uploadRoutes");
 
 dotenv.config();
 

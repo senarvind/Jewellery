@@ -1,9 +1,9 @@
-import { Router, Request, Response } from "express";
-import mongoose from "mongoose";
+const express = require("express");
+const mongoose = require("mongoose");
 
-const router = Router();
+const router = express.Router();
 
-router.get("/", (req: Request, res: Response) => {
+router.get("/", (req, res) => {
   const dbState = mongoose.connection.readyState;
   const dbStatus = dbState === 1 ? "connected" : dbState === 2 ? "connecting" : "disconnected";
 
@@ -19,4 +19,4 @@ router.get("/", (req: Request, res: Response) => {
   });
 });
 
-export default router;
+module.exports = router;

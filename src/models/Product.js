@@ -1,24 +1,7 @@
-import mongoose, { Schema, Document } from "mongoose";
+const mongoose = require("mongoose");
+const { Schema } = mongoose;
 
-export interface IProduct extends Document {
-  category: string;
-  productType: string;
-  description: string;
-  material: string;
-  dimensionL: string;
-  dimensionW: string;
-  dimensionH: string;
-  weight: string;
-  sellingPrice: number;
-  mrp: number;
-  frontImage: string;
-  backImage: string;
-  modelImage: string;
-  createdAt?: Date;
-  updatedAt?: Date;
-}
-
-const ProductSchema = new Schema<IProduct>(
+const ProductSchema = new Schema(
   {
     category:     { type: String, required: true, index: true },
     productType:  { type: String, required: true },
@@ -39,8 +22,6 @@ const ProductSchema = new Schema<IProduct>(
   }
 );
 
-const Product =
-  mongoose.models.Product ||
-  mongoose.model<IProduct>("Product", ProductSchema);
+const Product = mongoose.models.Product || mongoose.model("Product", ProductSchema);
 
-export default Product;
+module.exports = Product;
