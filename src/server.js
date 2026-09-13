@@ -6,11 +6,14 @@ const connectToDatabase = require("./config/db");
 
 const healthRoutes = require("./routes/healthRoutes");
 const authRoutes = require("./routes/authRoutes");
+const adminRoutes = require("./routes/adminRoutes");
 const productRoutes = require("./routes/productRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
 const cartRoutes = require("./routes/cartRoutes");
 const wishlistRoutes = require("./routes/wishlistRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
+const userRoutes = require("./routes/userRoutes");
+const orderRoutes = require("./routes/orderRoutes");
 
 dotenv.config();
 
@@ -36,11 +39,14 @@ app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 // API Routes
 app.use("/api/health", healthRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/wishlist", wishlistRoutes);
 app.use("/api/upload", uploadRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/orders", orderRoutes);
 
 // Root route
 app.get("/", (req, res) => {

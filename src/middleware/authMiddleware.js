@@ -46,8 +46,17 @@ function requireAuth(req, res, next) {
 
 function requireAdmin(req, res, next) {
   authenticateToken(req, res, () => {
-    if (!req.user || req.user.role !== "admin") {
+    if (!req.user || !["admin", "superadmin"].includes(req.user.role)) {
       return res.status(403).json({ success: false, error: "Admin access required" });
+    }
+    next();
+  });
+}
+
+function requireSuperAdmin(req, res, next) {
+  authenticateToken(req, res, () => {
+    if (!req.user || req.user.role !== "superadmin") {
+      return res.status(403).json({ success: false, error: "Super Admin privileges required" });
     }
     next();
   });
@@ -59,4 +68,6 @@ module.exports = {
   authenticateToken,
   requireAuth,
   requireAdmin,
+  requireSuperAdmin,
 };
+
