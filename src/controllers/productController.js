@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const connectToDatabase = require("../config/db");
 const ProductModel = require("../models/Product");
+const { uploadBase64ToCloudinary } = require("../config/cloudinary");
 
 const SAMPLE_PRODUCTS = [
   {
@@ -113,13 +114,12 @@ function toProduct(doc) {
 async function getAllProducts(req, res) {
   try {
     const conn = await connectToDatabase();
-    let dbProducts = [];
     if (conn) {
       const docs = await ProductModel.find({}).sort({ createdAt: -1 }).lean();
-      dbProducts = docs.map(toProduct);
+      const dbProducts = docs.map(toProduct);
+      return res.json({ success: true, count: dbProducts.length, products: dbProducts });
     }
-    const products = dbProducts.length > 0 ? dbProducts : SAMPLE_PRODUCTS;
-    return res.json({ success: true, count: products.length, products });
+    return res.json({ success: true, count: SAMPLE_PRODUCTS.length, products: SAMPLE_PRODUCTS });
   } catch (error) {
     console.error("Error in getAllProducts:", error);
     return res.json({ success: true, count: SAMPLE_PRODUCTS.length, products: SAMPLE_PRODUCTS });
@@ -129,29 +129,61 @@ async function getAllProducts(req, res) {
 async function getProductsByCategory(req, res) {
   try {
     const categorySlug = (req.params.slug || req.query.category || "").toString();
-    const normalizedSlug = categorySlug.toLowerCase().trim().replace(/s$/, "");
+    const cleanSlug = categorySlug.toLowerCase().trim();
+    const normalizedSlug = cleanSlug.replace(/[^a-z0-9]/g, "");
     const conn = await connectToDatabase();
     let dbProducts = [];
 
-    if (conn && categorySlug) {
-      const docs = await ProductModel.find({
-        category: { $regex: new RegExp(categorySlug, "i") },
-      }).sort({ createdAt: -1 }).lean();
-      dbProducts = docs.map(toProduct);
+    if (conn && cleanSlug) {
+      if (cleanSlug === "all" || cleanSlug === "all-products") {
+        const docs = await ProductModel.find({}).sort({ createdAt: -1 }).lean();
+        dbProducts = docs.map(toProduct);
+      } else if (cleanSlug === "new-arrival" || cleanSlug === "new-arrivals") {
+        const docs = await ProductModel.find({}).sort({ createdAt: -1 }).limit(30).lean();
+        dbProducts = docs.map(toProduct);
+      } else if (cleanSlug === "bestsellers" || cleanSlug === "bestseller") {
+        const docs = await ProductModel.find({}).sort({ sellingPrice: -1 }).limit(30).lean();
+        dbProducts = docs.map(toProduct);
+      } else {
+        const flexPattern = cleanSlug.replace(/[-\s]+/g, "[-\\s]?");
+        const singularSlug = cleanSlug.replace(/(?:es|s)$/i, "");
+        const singularFlex = singularSlug.replace(/[-\s]+/g, "[-\\s]?");
+
+        const docs = await ProductModel.find({
+          $or: [
+            { category: { $regex: new RegExp(flexPattern, "i") } },
+            { category: { $regex: new RegExp(singularFlex, "i") } },
+            { category: { $regex: new RegExp(cleanSlug, "i") } },
+            { category: { $regex: new RegExp(normalizedSlug, "i") } },
+            { productType: { $regex: new RegExp(singularFlex, "i") } },
+          ],
+        }).sort({ createdAt: -1 }).lean();
+
+        dbProducts = docs.map(toProduct);
+      }
+
+      return res.json({
+        success: true,
+        count: dbProducts.length,
+        products: dbProducts,
+      });
     }
 
-    const filteredSamples = SAMPLE_PRODUCTS.filter(
-      (p) =>
-        p.category.toLowerCase().includes(normalizedSlug) ||
-        normalizedSlug.includes(p.category.toLowerCase()) ||
-        p.productType.toLowerCase().includes(normalizedSlug)
-    );
+    // Fallback if database is not connected
+    let filteredSamples = SAMPLE_PRODUCTS;
+    if (cleanSlug !== "all" && cleanSlug !== "all-products") {
+      filteredSamples = SAMPLE_PRODUCTS.filter(
+        (p) =>
+          p.category.toLowerCase().includes(normalizedSlug) ||
+          normalizedSlug.includes(p.category.toLowerCase()) ||
+          p.productType.toLowerCase().includes(normalizedSlug)
+      );
+    }
 
-    const products = dbProducts.length > 0 ? dbProducts : filteredSamples;
     return res.json({
       success: true,
-      count: products.length,
-      products,
+      count: filteredSamples.length,
+      products: filteredSamples,
     });
   } catch (error) {
     console.error("Error in getProductsByCategory:", error);
@@ -188,6 +220,20 @@ async function createProduct(req, res) {
     const conn = await connectToDatabase();
     const { id, ...data } = req.body;
 
+    let frontImage = String(data.frontImage || "/images/categories/ring.png").trim();
+    let backImage = String(data.backImage || "/images/categories/ring.png").trim();
+    let modelImage = String(data.modelImage || "/images/categories/ring.png").trim();
+
+    if (frontImage.startsWith("data:image")) {
+      frontImage = await uploadBase64ToCloudinary(frontImage, "products");
+    }
+    if (backImage.startsWith("data:image")) {
+      backImage = await uploadBase64ToCloudinary(backImage, "products");
+    }
+    if (modelImage.startsWith("data:image")) {
+      modelImage = await uploadBase64ToCloudinary(modelImage, "products");
+    }
+
     // Smart defaults to prevent Mongoose validation failures
     const formattedData = {
       ...data,
@@ -199,9 +245,9 @@ async function createProduct(req, res) {
       sellingPrice: Number(data.sellingPrice) || 0,
       mrp: Number(data.mrp) || Number(data.sellingPrice) || 0,
       stock: Number(data.stock) || 10,
-      frontImage: String(data.frontImage || "/images/categories/ring.png").trim(),
-      backImage: String(data.backImage || "/images/categories/ring.png").trim(),
-      modelImage: String(data.modelImage || "/images/categories/ring.png").trim(),
+      frontImage,
+      backImage,
+      modelImage,
     };
 
     if (conn) {
@@ -239,6 +285,16 @@ async function updateProduct(req, res) {
     const conn = await connectToDatabase();
     if (!conn) {
       return res.status(500).json({ success: false, error: "Database connection unavailable" });
+    }
+
+    if (req.body.frontImage && req.body.frontImage.startsWith("data:image")) {
+      req.body.frontImage = await uploadBase64ToCloudinary(req.body.frontImage, "products");
+    }
+    if (req.body.backImage && req.body.backImage.startsWith("data:image")) {
+      req.body.backImage = await uploadBase64ToCloudinary(req.body.backImage, "products");
+    }
+    if (req.body.modelImage && req.body.modelImage.startsWith("data:image")) {
+      req.body.modelImage = await uploadBase64ToCloudinary(req.body.modelImage, "products");
     }
 
     const updatedDoc = await ProductModel.findByIdAndUpdate(id, req.body, {
@@ -295,7 +351,28 @@ async function bulkCreateProducts(req, res) {
       return res.status(500).json({ success: false, error: "Database connection unavailable" });
     }
 
-    const cleaned = products.map(({ id, ...rest }) => rest);
+    const cleaned = await Promise.all(
+      products.map(async ({ id, ...rest }) => {
+        let frontImage = rest.frontImage || "";
+        let backImage = rest.backImage || "";
+        let modelImage = rest.modelImage || "";
+        if (frontImage.startsWith("data:image")) {
+          frontImage = await uploadBase64ToCloudinary(frontImage, "products");
+        }
+        if (backImage.startsWith("data:image")) {
+          backImage = await uploadBase64ToCloudinary(backImage, "products");
+        }
+        if (modelImage.startsWith("data:image")) {
+          modelImage = await uploadBase64ToCloudinary(modelImage, "products");
+        }
+        return {
+          ...rest,
+          frontImage,
+          backImage,
+          modelImage,
+        };
+      })
+    );
     const result = await ProductModel.insertMany(cleaned);
 
     return res.status(201).json({

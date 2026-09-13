@@ -2,22 +2,26 @@ const cloudinary = require("cloudinary").v2;
 
 // Configure Cloudinary with environment variables
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
+  cloud_name: (process.env.CLOUDINARY_CLOUD_NAME || "").trim(),
+  api_key: (process.env.CLOUDINARY_API_KEY || "").trim(),
+  api_secret: (process.env.CLOUDINARY_API_SECRET || "").trim(),
 });
 
 /**
  * Helper to check if Cloudinary is properly configured in env variables
  */
 const isCloudinaryConfigured = () => {
+  const cName = (process.env.CLOUDINARY_CLOUD_NAME || "").trim();
+  const aKey = (process.env.CLOUDINARY_API_KEY || "").trim();
+  const aSecret = (process.env.CLOUDINARY_API_SECRET || "").trim();
+
   return Boolean(
-    process.env.CLOUDINARY_CLOUD_NAME &&
-      process.env.CLOUDINARY_CLOUD_NAME !== "your_cloud_name" &&
-      process.env.CLOUDINARY_API_KEY &&
-      process.env.CLOUDINARY_API_KEY !== "your_api_key" &&
-      process.env.CLOUDINARY_API_SECRET &&
-      process.env.CLOUDINARY_API_SECRET !== "your_api_secret"
+    cName &&
+      cName !== "your_cloud_name" &&
+      aKey &&
+      aKey !== "your_api_key" &&
+      aSecret &&
+      aSecret !== "your_api_secret"
   );
 };
 
@@ -44,6 +48,29 @@ const uploadToCloudinary = (fileBuffer, folder = "products") => {
 };
 
 /**
+ * Upload base64 string directly to Cloudinary
+ * @param {string} base64Data - base64 image string or URL
+ * @param {string} folder - Target folder in Cloudinary
+ * @returns {Promise<string>} Uploaded Cloudinary secure_url or original string
+ */
+const uploadBase64ToCloudinary = async (base64Data, folder = "products") => {
+  if (!base64Data || typeof base64Data !== "string") return base64Data;
+  if (!base64Data.startsWith("data:image")) return base64Data;
+  if (!isCloudinaryConfigured()) return base64Data;
+
+  try {
+    const result = await cloudinary.uploader.upload(base64Data, {
+      folder: folder,
+      resource_type: "auto",
+    });
+    return result.secure_url;
+  } catch (err) {
+    console.error("Cloudinary base64 upload error:", err);
+    return base64Data;
+  }
+};
+
+/**
  * Delete image from Cloudinary by public_id
  * @param {string} publicId 
  * @returns {Promise<Object>}
@@ -57,5 +84,6 @@ module.exports = {
   cloudinary,
   isCloudinaryConfigured,
   uploadToCloudinary,
+  uploadBase64ToCloudinary,
   deleteFromCloudinary,
 };
