@@ -135,22 +135,16 @@ async function createAdmin(req, res) {
       return res.status(400).json({ success: false, error: "An admin account with this email already exists" });
     }
 
-    // ── STRICT SINGLE SUPER ADMIN RULE ──
-    const existingSuperAdmin = await AdminModel.findOne({ role: "superadmin" }).lean();
-
-    let assignedRole = "admin";
-    if (!existingSuperAdmin) {
-      // First admin created in MongoDB becomes the SUPER ADMIN!
-      assignedRole = "superadmin";
-    } else {
-      if (role === "superadmin") {
-        return res.status(400).json({
-          success: false,
-          error: "A Super Admin account already exists. Only ONE Super Admin is permitted in the system.",
-        });
-      }
-      assignedRole = role && ["admin", "manager"].includes(role) ? role : "admin";
+    // ── STRICT ONLY ONE SINGLE SUPER ADMIN ACCOUNT PERMITTED IN SYSTEM ──
+    const totalAdminsCount = await AdminModel.countDocuments();
+    if (totalAdminsCount >= 1) {
+      return res.status(400).json({
+        success: false,
+        error: "Security Policy: Only ONE Super Admin account is permitted in Keshar Jewellers Admin Panel. Additional admin creation is disabled.",
+      });
     }
+
+    const assignedRole = "superadmin";
 
     // Hash admin password
     const salt = await bcrypt.genSalt(10);
@@ -163,9 +157,7 @@ async function createAdmin(req, res) {
       password: hashedPassword,
       phone: phone ? phone.trim() : "",
       role: assignedRole,
-      permissions: Array.isArray(permissions) && permissions.length > 0
-        ? permissions
-        : ["products", "orders", "inventory", "users", "analytics"],
+      permissions: ["products", "orders", "inventory", "users", "analytics", "settings"],
       status: "active",
     });
 
@@ -177,7 +169,7 @@ async function createAdmin(req, res) {
 
     return res.status(201).json({
       success: true,
-      message: `Admin account created successfully! Role: ${assignedRole.toUpperCase()} 👑`,
+      message: "Super Admin account created successfully! 👑",
       admin: sanitizeAdmin(newAdmin, token),
     });
   } catch (error) {
