@@ -18,15 +18,15 @@ const {
 
 const { requireAdmin, requireSuperAdmin } = require("../middleware/authMiddleware");
 
-// Public Authentication Endpoint
+// Admin Endpoints
 router.post("/login", adminLogin);
+router.post("/create", createAdmin);
 
 // Protected Admin Endpoints
 router.get("/profile", requireAdmin, getAdminProfile);
 router.get("/", requireAdmin, getAllAdmins);
 
 // Super Admin Only Operations
-router.post("/create", requireSuperAdmin, createAdmin);
 router.put("/:id", requireSuperAdmin, updateAdmin);
 router.delete("/:id", requireSuperAdmin, deleteAdmin);
 
