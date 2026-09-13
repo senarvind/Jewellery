@@ -28,7 +28,7 @@ function sanitizeAdmin(admin, token) {
 
 /**
  * POST /api/admin/login
- * Admin Login Authentication
+ * Admin Login Authentication directly against MongoDB
  */
 async function adminLogin(req, res) {
   try {
@@ -38,103 +38,68 @@ async function adminLogin(req, res) {
     }
 
     const emailNormalized = String(email).toLowerCase().trim();
+    const conn = await connectToDatabase();
 
-    // ── DEFAULT SUPER ADMIN DIRECT ACCESS ──
-    if (
-      (emailNormalized === "himanshu@kesharjewellers.com" ||
-       emailNormalized === "admin@kesharjewellers.com" ||
-       emailNormalized === "admin") &&
-      (password === "admin123" || password.length >= 4)
-    ) {
-      const token = generateToken({
-        adminId: "super-admin-seed",
+    if (!conn) {
+      return res.status(500).json({ success: false, error: "Database connection unavailable" });
+    }
+
+    // 1. Find admin in MongoDB
+    let admin = await AdminModel.findOne({ email: emailNormalized });
+
+    // 2. If no admin exists in MongoDB at all, auto-create the initial Super Admin account in MongoDB
+    const totalAdmins = await AdminModel.countDocuments();
+    if (!admin && totalAdmins === 0) {
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(password.length >= 4 ? password : "admin123", salt);
+      admin = await AdminModel.create({
+        name: emailNormalized.split("@")[0] || "Super Admin",
         email: emailNormalized,
+        password: hashedPassword,
+        phone: "+91 98765 43210",
         role: "superadmin",
-      });
-      return res.json({
-        success: true,
-        message: "Admin authentication successful! 👑",
-        admin: {
-          id: "super-admin-seed",
-          name: "Himanshu Soni (Super Admin)",
-          email: emailNormalized,
-          phone: "+91 98765 43210",
-          role: "superadmin",
-          permissions: ["products", "orders", "inventory", "users", "analytics", "settings"],
-          token,
-        },
+        permissions: ["products", "orders", "inventory", "users", "analytics", "settings"],
+        status: "active",
       });
     }
 
-    let conn;
+    if (!admin) {
+      return res.status(401).json({ success: false, error: "Invalid email or password" });
+    }
+
+    if (admin.status === "suspended") {
+      return res.status(403).json({ success: false, error: "Admin account has been suspended" });
+    }
+
+    let isMatch = false;
     try {
-      conn = await connectToDatabase();
-    } catch (e) {
-      console.warn("MongoDB connection warning in adminLogin:", e);
+      isMatch = await bcrypt.compare(password, admin.password);
+    } catch (err) {
+      isMatch = admin.password === password;
     }
 
-    if (conn) {
-      const admin = await AdminModel.findOne({ email: emailNormalized });
-
-      if (admin) {
-        if (admin.status === "suspended") {
-          return res.status(403).json({ success: false, error: "Admin account has been suspended" });
-        }
-
-        let isMatch = false;
-        try {
-          isMatch = await bcrypt.compare(password, admin.password);
-        } catch (err) {
-          isMatch = admin.password === password;
-        }
-
-        if (!isMatch && admin.password === password) {
-          isMatch = true;
-        }
-
-        if (!isMatch && password === "admin123") {
-          isMatch = true;
-        }
-
-        if (isMatch) {
-          admin.lastLogin = new Date();
-          await admin.save();
-
-          const token = generateToken({
-            adminId: admin._id.toString(),
-            email: admin.email,
-            role: admin.role,
-            permissions: admin.permissions,
-          });
-
-          return res.json({
-            success: true,
-            message: "Admin authentication successful! 👑",
-            admin: sanitizeAdmin(admin, token),
-          });
-        }
-      }
+    if (!isMatch && admin.password === password) {
+      isMatch = true;
     }
 
-    // Default Fallback Admin Account
-    const fallbackToken = generateToken({
-      adminId: `admin-${Date.now()}`,
-      email: emailNormalized,
-      role: "admin",
+    if (!isMatch) {
+      return res.status(401).json({ success: false, error: "Invalid email or password" });
+    }
+
+    admin.lastLogin = new Date();
+    await admin.save();
+
+    const token = generateToken({
+      adminId: admin._id.toString(),
+      email: admin.email,
+      role: admin.role,
+      permissions: admin.permissions,
     });
 
     return res.json({
       success: true,
       message: "Admin authentication successful! 👑",
-      admin: {
-        id: `admin-${Date.now()}`,
-        name: emailNormalized.split("@")[0] || "Store Admin",
-        email: emailNormalized,
-        phone: "+91 98765 43210",
-        role: "admin",
-        permissions: ["products", "orders", "inventory", "users", "analytics"],
-        token: fallbackToken,
-      },
+      admin: sanitizeAdmin(admin, token),
     });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message || "Admin login failed" });
@@ -143,7 +108,7 @@ async function adminLogin(req, res) {
 
 /**
  * POST /api/admin/create
- * Create a new Admin Account
+ * Create a new Admin Account saved directly to MongoDB (Single Super Admin Rule)
  */
 async function createAdmin(req, res) {
   try {
@@ -157,82 +122,63 @@ async function createAdmin(req, res) {
       return res.status(400).json({ success: false, error: "Password must be at least 6 characters long" });
     }
 
-    let conn;
-    try {
-      conn = await connectToDatabase();
-    } catch (e) {
-      console.warn("MongoDB connection warning in createAdmin:", e);
+    const conn = await connectToDatabase();
+    if (!conn) {
+      return res.status(500).json({ success: false, error: "Database connection unavailable" });
     }
 
     const emailNormalized = email.toLowerCase().trim();
 
-    if (conn) {
-      const existingAdmin = await AdminModel.findOne({ email: emailNormalized }).lean();
-      if (existingAdmin) {
-        return res.status(400).json({ success: false, error: "An admin account with this email already exists" });
-      }
-
-      const targetRole = role && ["superadmin", "admin", "manager"].includes(role) ? role : "admin";
-
-      if (targetRole === "superadmin") {
-        const existingSuperAdmin = await AdminModel.findOne({ role: "superadmin" }).lean();
-        if (existingSuperAdmin) {
-          return res.status(400).json({
-            success: false,
-            error: "A Super Admin account already exists. Only ONE Super Admin is permitted in the system.",
-          });
-        }
-      }
-
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(password, salt);
-
-      const newAdmin = await AdminModel.create({
-        name: name.trim(),
-        email: emailNormalized,
-        password: hashedPassword,
-        phone: phone ? phone.trim() : "",
-        role: targetRole,
-        permissions: Array.isArray(permissions) && permissions.length > 0
-          ? permissions
-          : ["products", "orders", "inventory", "users", "analytics"],
-        status: "active",
-      });
-
-      const token = generateToken({
-        adminId: newAdmin._id.toString(),
-        email: newAdmin.email,
-        role: newAdmin.role,
-      });
-
-      return res.status(201).json({
-        success: true,
-        message: "Admin account created successfully! 👑",
-        admin: sanitizeAdmin(newAdmin, token),
-      });
+    // Check if an admin with this email already exists in MongoDB
+    const existingAdmin = await AdminModel.findOne({ email: emailNormalized }).lean();
+    if (existingAdmin) {
+      return res.status(400).json({ success: false, error: "An admin account with this email already exists" });
     }
 
-    // Fallback Admin Account Creation if DB is offline
-    const fallbackId = `admin-${Date.now()}`;
-    const fallbackToken = generateToken({
-      adminId: fallbackId,
+    // ── STRICT SINGLE SUPER ADMIN RULE ──
+    const existingSuperAdmin = await AdminModel.findOne({ role: "superadmin" }).lean();
+
+    let assignedRole = "admin";
+    if (!existingSuperAdmin) {
+      // First admin created in MongoDB becomes the SUPER ADMIN!
+      assignedRole = "superadmin";
+    } else {
+      if (role === "superadmin") {
+        return res.status(400).json({
+          success: false,
+          error: "A Super Admin account already exists. Only ONE Super Admin is permitted in the system.",
+        });
+      }
+      assignedRole = role && ["admin", "manager"].includes(role) ? role : "admin";
+    }
+
+    // Hash admin password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Save directly to MongoDB Database
+    const newAdmin = await AdminModel.create({
+      name: name.trim(),
       email: emailNormalized,
-      role: "admin",
+      password: hashedPassword,
+      phone: phone ? phone.trim() : "",
+      role: assignedRole,
+      permissions: Array.isArray(permissions) && permissions.length > 0
+        ? permissions
+        : ["products", "orders", "inventory", "users", "analytics"],
+      status: "active",
+    });
+
+    const token = generateToken({
+      adminId: newAdmin._id.toString(),
+      email: newAdmin.email,
+      role: newAdmin.role,
     });
 
     return res.status(201).json({
       success: true,
-      message: "Admin account created successfully! 👑",
-      admin: {
-        id: fallbackId,
-        name: name.trim(),
-        email: emailNormalized,
-        phone: phone ? phone.trim() : "",
-        role: "admin",
-        permissions: ["products", "orders", "inventory", "users", "analytics"],
-        status: "active",
-        token: fallbackToken,
-      },
+      message: `Admin account created successfully! Role: ${assignedRole.toUpperCase()} 👑`,
+      admin: sanitizeAdmin(newAdmin, token),
     });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message || "Admin creation failed" });
