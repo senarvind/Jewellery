@@ -2,41 +2,14 @@ const connectToDatabase = require("../config/db");
 const UserModel = require("../models/User");
 const AdminModel = require("../models/Admin");
 
-const SAMPLE_USERS = [
-  {
-    id: "usr-sample-1",
-    name: "Himanshu Soni (Super Admin)",
-    email: "himanshu@kesharjewellers.com",
-    phone: "+91 98765 43210",
-    role: "admin",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "usr-sample-2",
-    name: "Priya Sharma",
-    email: "priya.sharma@example.com",
-    phone: "+91 98765 12345",
-    role: "user",
-    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: "usr-sample-3",
-    name: "Vikram Malhotra",
-    email: "vikram.m@example.com",
-    phone: "+91 98123 45678",
-    role: "user",
-    createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-];
-
 function sanitizeUser(doc) {
   return {
     id: doc._id ? doc._id.toString() : doc.id,
-    name: doc.name,
-    email: doc.email,
+    name: doc.name || "User",
+    email: doc.email || "",
     phone: doc.phone || "",
     role: doc.role || "user",
-    createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : undefined,
+    createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : new Date().toISOString(),
   };
 }
 
@@ -57,17 +30,15 @@ async function getAllUsers(req, res) {
         email: a.email,
         phone: a.phone || "",
         role: "admin",
-        createdAt: a.createdAt ? new Date(a.createdAt).toISOString() : undefined,
+        createdAt: a.createdAt ? new Date(a.createdAt).toISOString() : new Date().toISOString(),
       }));
     }
 
     const allCombined = [...dbAdmins, ...dbUsers];
-    const finalUsers = allCombined.length > 0 ? allCombined : SAMPLE_USERS;
-
-    return res.json({ success: true, count: finalUsers.length, users: finalUsers });
+    return res.json({ success: true, count: allCombined.length, users: allCombined });
   } catch (error) {
     console.error("Error in getAllUsers:", error);
-    return res.json({ success: true, count: SAMPLE_USERS.length, users: SAMPLE_USERS });
+    return res.status(500).json({ success: false, error: error.message, users: [] });
   }
 }
 
