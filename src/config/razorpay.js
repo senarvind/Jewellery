@@ -3,8 +3,8 @@ const dotenv = require("dotenv");
 
 dotenv.config();
 
-const razorpayKeyId = process.env.RAZORPAY_KEY_ID || "rzp_test_1234567890abcdef";
-const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET || "rzp_test_secret_1234567890abcdef";
+const razorpayKeyId = (process.env.RAZORPAY_KEY_ID || "").trim();
+const razorpayKeySecret = (process.env.RAZORPAY_KEY_SECRET || "").trim();
 
 const razorpayInstance = new Razorpay({
   key_id: razorpayKeyId,
@@ -14,4 +14,5 @@ const razorpayInstance = new Razorpay({
 module.exports = {
   razorpayInstance,
   razorpayKeyId,
+  razorpayKeySecret,
 };
