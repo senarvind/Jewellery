@@ -15,6 +15,8 @@ const UserSchema = new Schema(
     password: { type: String, required: true },
     phone: { type: String, default: "" },
     role: { type: String, enum: ["user", "admin"], default: "user" },
+    resetPasswordOtp: { type: String, default: null },
+    resetPasswordOtpExpires: { type: Date, default: null },
   },
   {
     timestamps: true,

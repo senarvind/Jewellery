@@ -2,6 +2,7 @@ const connectToDatabase = require("../config/db");
 const UserModel = require("../models/User");
 const bcrypt = require("bcryptjs");
 const { generateToken, verifyToken } = require("../middleware/authMiddleware");
+const { sendResetOtpEmail } = require("../utils/sendEmail");
 
 function sanitizeUser(user, token) {
   return {
@@ -204,10 +205,98 @@ async function updateProfile(req, res) {
   }
 }
 
+async function forgotPassword(req, res) {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, error: "Email is required" });
+    }
+
+    const conn = await connectToDatabase();
+    if (!conn) {
+      return res.status(500).json({ success: false, error: "Database connection unavailable" });
+    }
+
+    const emailNormalized = email.toLowerCase().trim();
+    const user = await UserModel.findOne({ email: emailNormalized });
+    if (!user) {
+      return res.status(404).json({ success: false, error: "No account found with this email address" });
+    }
+
+    // Generate 6-digit random numeric OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Set OTP expiration to 15 minutes
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+    user.resetPasswordOtp = otp;
+    user.resetPasswordOtpExpires = expiresAt;
+    await user.save();
+
+    // Send Email
+    await sendResetOtpEmail(user.email, otp, user.name);
+
+    return res.json({
+      success: true,
+      message: "Verification OTP code has been sent to your email! ✉️",
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message || "Failed to process forgot password request" });
+  }
+}
+
+async function resetPassword(req, res) {
+  try {
+    const { email, otp, newPassword } = req.body;
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ success: false, error: "Email, OTP code and new password are required" });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ success: false, error: "New password must be at least 6 characters long" });
+    }
+
+    const conn = await connectToDatabase();
+    if (!conn) {
+      return res.status(500).json({ success: false, error: "Database connection unavailable" });
+    }
+
+    const emailNormalized = email.toLowerCase().trim();
+    const user = await UserModel.findOne({ email: emailNormalized });
+    if (!user) {
+      return res.status(404).json({ success: false, error: "User not found" });
+    }
+
+    if (!user.resetPasswordOtp || user.resetPasswordOtp !== otp.trim()) {
+      return res.status(400).json({ success: false, error: "Invalid OTP verification code" });
+    }
+
+    if (!user.resetPasswordOtpExpires || new Date(user.resetPasswordOtpExpires) < new Date()) {
+      return res.status(400).json({ success: false, error: "OTP verification code has expired. Please request a new code." });
+    }
+
+    // Hash new password and reset OTP fields
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    user.resetPasswordOtp = null;
+    user.resetPasswordOtpExpires = null;
+    await user.save();
+
+    return res.json({
+      success: true,
+      message: "Password reset successful! You can now log in with your new password. 💎",
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message || "Failed to reset password" });
+  }
+}
+
 module.exports = {
   register,
   login,
   getMe,
   logout,
   updateProfile,
+  forgotPassword,
+  resetPassword,
 };

@@ -116,7 +116,7 @@ async function createOrder(req, res) {
 async function updateOrderStatus(req, res) {
   try {
     const id = req.params.id || req.body.id;
-    const { status } = req.body;
+    const { status, message, description } = req.body;
     if (!id || !status) {
       return res.status(400).json({ success: false, error: "Order ID and status are required" });
     }
@@ -129,6 +129,33 @@ async function updateOrderStatus(req, res) {
     const updated = await OrderModel.findByIdAndUpdate(id, { status }, { new: true }).lean();
     if (!updated) {
       return res.status(404).json({ success: false, error: "Order not found" });
+    }
+
+    // Sync status with OrderTrackingModel if it exists
+    const OrderTrackingModel = require("../models/OrderTracking");
+    const tracking = await OrderTrackingModel.findOne({ orderId: id });
+    if (tracking) {
+      const mappedTrackingStatus = {
+        pending: "order_placed",
+        confirmed: "quality_checked",
+        shipped: "shipped",
+        delivered: "delivered",
+        cancelled: "cancelled",
+      }[status] || "order_placed";
+      
+      const customMessage = message || description || `Order status updated to ${status} by admin`;
+      
+      tracking.currentStatus = mappedTrackingStatus;
+      tracking.history.push({
+        status: mappedTrackingStatus,
+        location: "System Update",
+        description: customMessage,
+        timestamp: new Date(),
+      });
+      if (status === "delivered") {
+        tracking.currentLocation = updated.customerAddress || "Delivered";
+      }
+      await tracking.save();
     }
 
     return res.json({ success: true, message: "Order status updated", order: sanitizeOrder(updated) });
@@ -160,8 +187,77 @@ async function deleteOrder(req, res) {
   }
 }
 
+async function getOrderById(req, res) {
+  try {
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ success: false, error: "Order ID is required" });
+    }
+
+    const conn = await connectToDatabase();
+    if (conn) {
+      // Check if valid ObjectId
+      let orderDoc = null;
+      if (id.match(/^[0-9a-fA-F]{24}$/)) {
+        orderDoc = await OrderModel.findById(id).lean();
+      }
+
+      if (!orderDoc) {
+        orderDoc = await OrderModel.findOne({
+          $or: [
+            { razorpayOrderId: id },
+            { razorpayPaymentId: id }
+          ]
+        }).lean();
+      }
+
+      if (orderDoc) {
+        return res.json({ success: true, order: sanitizeOrder(orderDoc) });
+      }
+    }
+
+    return res.status(404).json({ success: false, error: "Order not found" });
+  } catch (error) {
+    console.error("Error in getOrderById:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+async function searchOrders(req, res) {
+  try {
+    const query = (req.query.q || req.query.query || req.query.email || req.query.phone || "").trim();
+    if (!query) {
+      return res.status(400).json({ success: false, error: "Search query is required", orders: [] });
+    }
+
+    const conn = await connectToDatabase();
+    let dbOrders = [];
+    if (conn) {
+      const regex = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), "i");
+      const docs = await OrderModel.find({
+        $or: [
+          { customerEmail: regex },
+          { customerPhone: regex },
+          { customerName: regex },
+          { razorpayOrderId: regex },
+          { razorpayPaymentId: regex }
+        ]
+      }).sort({ createdAt: -1 }).lean();
+
+      dbOrders = docs.map(sanitizeOrder);
+    }
+
+    return res.json({ success: true, count: dbOrders.length, orders: dbOrders });
+  } catch (error) {
+    console.error("Error in searchOrders:", error);
+    return res.status(500).json({ success: false, error: error.message, orders: [] });
+  }
+}
+
 module.exports = {
   getAllOrders,
+  getOrderById,
+  searchOrders,
   createOrder,
   updateOrderStatus,
   deleteOrder,

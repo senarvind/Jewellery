@@ -15,6 +15,7 @@ const uploadRoutes = require("./routes/uploadRoutes");
 const userRoutes = require("./routes/userRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
+const orderTrackingRoutes = require("./routes/orderTrackingRoutes");
 
 dotenv.config();
 
@@ -52,6 +53,7 @@ app.use("/api/upload", uploadRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/payment", paymentRoutes);
+app.use("/api/tracking", orderTrackingRoutes);
 
 // Root route
 app.get("/", (req, res) => {
