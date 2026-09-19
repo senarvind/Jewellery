@@ -66,7 +66,7 @@ const uploadBase64ToCloudinary = async (base64Data, folder = "products") => {
     return result.secure_url;
   } catch (err) {
     console.error("Cloudinary base64 upload error:", err);
-    return base64Data;
+    throw new Error("Failed to upload image to Cloudinary. Please check your credentials.");
   }
 };
 
