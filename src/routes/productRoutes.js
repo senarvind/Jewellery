@@ -16,6 +16,7 @@ router.get("/category/:slug", getProductsByCategory);
 router.get("/:id", getProductById);
 router.post("/", createProduct);
 router.post("/bulk", bulkCreateProducts);
+router.put("/", updateProduct);
 router.put("/:id", updateProduct);
 router.delete("/:id", deleteProduct);
 router.delete("/", deleteProduct);
