@@ -22,6 +22,11 @@ const ProductSchema = new Schema(
   }
 );
 
+// Index for fast admin list (sort by newest first)
+ProductSchema.index({ createdAt: -1 });
+// Index for category filter page on storefront
+ProductSchema.index({ category: 1, createdAt: -1 });
+
 const Product = mongoose.models.Product || mongoose.model("Product", ProductSchema);
 
 module.exports = Product;

@@ -1,6 +1,7 @@
 const express = require("express");
 const {
   getAllProducts,
+  getAdminProducts,
   getProductsByCategory,
   getProductById,
   createProduct,
@@ -11,6 +12,7 @@ const {
 
 const router = express.Router();
 
+router.get("/admin", getAdminProducts);   // ← Fast admin-only endpoint
 router.get("/", getAllProducts);
 router.get("/category/:slug", getProductsByCategory);
 router.get("/:id", getProductById);

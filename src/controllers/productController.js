@@ -40,6 +40,49 @@ async function getAllProducts(req, res) {
   }
 }
 
+// Lightweight version for Admin Panel — returns minimal fields, no heavy image URLs in list
+async function getAdminProducts(req, res) {
+  try {
+    const conn = await connectToDatabase();
+    if (!conn) return res.json({ success: true, count: 0, products: [] });
+
+    // Projection: fetch all fields including images (admin needs full edit)
+    // But use lean() + sort on indexed field for speed
+    const docs = await ProductModel.find(
+      {},
+      {
+        _id: 1,
+        category: 1,
+        productType: 1,
+        description: 1,
+        material: 1,
+        dimensionL: 1,
+        dimensionW: 1,
+        dimensionH: 1,
+        weight: 1,
+        sellingPrice: 1,
+        mrp: 1,
+        stock: 1,
+        frontImage: 1,
+        backImage: 1,
+        modelImage: 1,
+        createdAt: 1,
+      }
+    )
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const products = docs.map(toProduct);
+
+    // Cache header: admin panel can cache for 10s (short TTL for freshness)
+    res.set("Cache-Control", "private, max-age=10");
+    return res.json({ success: true, count: products.length, products });
+  } catch (error) {
+    console.error("Error in getAdminProducts:", error);
+    return res.status(500).json({ success: false, error: error.message, products: [] });
+  }
+}
+
 async function getProductsByCategory(req, res) {
   try {
     const categorySlug = (req.params.slug || req.query.category || "").toString();
@@ -289,6 +332,7 @@ async function bulkCreateProducts(req, res) {
 
 module.exports = {
   getAllProducts,
+  getAdminProducts,
   getProductsByCategory,
   getProductById,
   createProduct,
