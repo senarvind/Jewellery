@@ -40,6 +40,49 @@ async function getAllProducts(req, res) {
   }
 }
 
+// Lightweight version for Admin Panel — returns minimal fields, no heavy image URLs in list
+async function getAdminProducts(req, res) {
+  try {
+    const conn = await connectToDatabase();
+    if (!conn) return res.json({ success: true, count: 0, products: [] });
+
+    // Projection: fetch all fields including images (admin needs full edit)
+    // But use lean() + sort on indexed field for speed
+    const docs = await ProductModel.find(
+      {},
+      {
+        _id: 1,
+        category: 1,
+        productType: 1,
+        description: 1,
+        material: 1,
+        dimensionL: 1,
+        dimensionW: 1,
+        dimensionH: 1,
+        weight: 1,
+        sellingPrice: 1,
+        mrp: 1,
+        stock: 1,
+        frontImage: 1,
+        backImage: 1,
+        modelImage: 1,
+        createdAt: 1,
+      }
+    )
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const products = docs.map(toProduct);
+
+    // Cache header: admin panel can cache for 10s (short TTL for freshness)
+    res.set("Cache-Control", "private, max-age=10");
+    return res.json({ success: true, count: products.length, products });
+  } catch (error) {
+    console.error("Error in getAdminProducts:", error);
+    return res.status(500).json({ success: false, error: error.message, products: [] });
+  }
+}
+
 async function getProductsByCategory(req, res) {
   try {
     const categorySlug = (req.params.slug || req.query.category || "").toString();
@@ -166,23 +209,39 @@ async function createProduct(req, res) {
 
 async function updateProduct(req, res) {
   try {
-    const { id } = req.params;
+    const id = req.params.id || req.body.id || req.query.id;
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, error: "Valid Product ID is required" });
+    }
+
     const conn = await connectToDatabase();
     if (!conn) {
       return res.status(500).json({ success: false, error: "Database connection unavailable" });
     }
 
-    if (req.body.frontImage && req.body.frontImage.startsWith("data:image")) {
-      req.body.frontImage = await uploadBase64ToCloudinary(req.body.frontImage, "products");
+    const { id: _, _id: __, ...updateData } = req.body;
+
+    if (updateData.frontImage && updateData.frontImage.startsWith("data:image")) {
+      updateData.frontImage = await uploadBase64ToCloudinary(updateData.frontImage, "products");
     }
-    if (req.body.backImage && req.body.backImage.startsWith("data:image")) {
-      req.body.backImage = await uploadBase64ToCloudinary(req.body.backImage, "products");
+    if (updateData.backImage && updateData.backImage.startsWith("data:image")) {
+      updateData.backImage = await uploadBase64ToCloudinary(updateData.backImage, "products");
     }
-    if (req.body.modelImage && req.body.modelImage.startsWith("data:image")) {
-      req.body.modelImage = await uploadBase64ToCloudinary(req.body.modelImage, "products");
+    if (updateData.modelImage && updateData.modelImage.startsWith("data:image")) {
+      updateData.modelImage = await uploadBase64ToCloudinary(updateData.modelImage, "products");
     }
 
-    const updatedDoc = await ProductModel.findByIdAndUpdate(id, req.body, {
+    if (updateData.sellingPrice !== undefined) {
+      updateData.sellingPrice = Number(updateData.sellingPrice) || 0;
+    }
+    if (updateData.mrp !== undefined) {
+      updateData.mrp = Number(updateData.mrp) || updateData.sellingPrice || 0;
+    }
+    if (updateData.stock !== undefined) {
+      updateData.stock = Number(updateData.stock) || 0;
+    }
+
+    const updatedDoc = await ProductModel.findByIdAndUpdate(id, updateData, {
       new: true,
       runValidators: true,
     }).lean();
@@ -197,6 +256,7 @@ async function updateProduct(req, res) {
       product: toProduct(updatedDoc),
     });
   } catch (error) {
+    console.error("Failed to update product:", error);
     return res.status(500).json({ success: false, error: error.message || "Failed to update product" });
   }
 }
@@ -272,6 +332,7 @@ async function bulkCreateProducts(req, res) {
 
 module.exports = {
   getAllProducts,
+  getAdminProducts,
   getProductsByCategory,
   getProductById,
   createProduct,

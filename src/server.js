@@ -16,7 +16,11 @@ const userRoutes = require("./routes/userRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const orderTrackingRoutes = require("./routes/orderTrackingRoutes");
+<<<<<<< HEAD
 const giftRoutes = require("./routes/giftRoutes");
+=======
+const offerRoutes = require('./routes/offerRoutes');
+>>>>>>> aeb4454c4babfbb19bd111308cadd884c1845982
 
 dotenv.config();
 
@@ -55,7 +59,11 @@ app.use("/api/users", userRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/tracking", orderTrackingRoutes);
+<<<<<<< HEAD
 app.use("/api/gifts", giftRoutes);
+=======
+app.use('/api/offers', offerRoutes);
+>>>>>>> aeb4454c4babfbb19bd111308cadd884c1845982
 
 // Root route
 app.get("/", (req, res) => {

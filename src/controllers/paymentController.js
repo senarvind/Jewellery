@@ -63,7 +63,11 @@ async function createRazorpayOrder(req, res) {
       notes,
     };
 
-    const razorpayOrder = await razorpayInstance.orders.create(options);
+    const client = razorpayInstance || new (require("razorpay"))({
+      key_id: currentKeyId,
+      key_secret: currentKeySecret,
+    });
+    const razorpayOrder = await client.orders.create(options);
 
     return res.status(201).json({
       success: true,
