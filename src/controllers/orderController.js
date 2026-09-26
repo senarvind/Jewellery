@@ -12,6 +12,12 @@ function sanitizeOrder(doc) {
     totalAmount: doc.totalAmount || 0,
     status: doc.status || "pending",
     notes: doc.notes || "",
+    giftId: doc.giftId ? (doc.giftId._id || doc.giftId).toString() : null,
+    gift: doc.giftId && typeof doc.giftId === "object" && doc.giftId.name ? {
+      _id: doc.giftId._id,
+      name: doc.giftId.name,
+      image: doc.giftId.image
+    } : null,
     createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : new Date().toISOString(),
   };
 }
@@ -73,13 +79,13 @@ async function getAllOrders(req, res) {
     const conn = await connectToDatabase();
     let dbOrders = [];
     if (conn) {
-      let docs = await OrderModel.find({}).sort({ createdAt: -1 }).lean();
+      let docs = await OrderModel.find({}).sort({ createdAt: -1 }).populate("giftId").lean();
       
       // Auto-seed if database orders collection is empty
       if (docs.length === 0) {
         try {
           await OrderModel.insertMany(INITIAL_SEED_ORDERS);
-          docs = await OrderModel.find({}).sort({ createdAt: -1 }).lean();
+          docs = await OrderModel.find({}).sort({ createdAt: -1 }).populate("giftId").lean();
         } catch (seedErr) {
           console.warn("Failed to seed initial orders:", seedErr);
         }
@@ -199,7 +205,7 @@ async function getOrderById(req, res) {
       // Check if valid ObjectId
       let orderDoc = null;
       if (id.match(/^[0-9a-fA-F]{24}$/)) {
-        orderDoc = await OrderModel.findById(id).lean();
+        orderDoc = await OrderModel.findById(id).populate("giftId").lean();
       }
 
       if (!orderDoc) {
@@ -208,7 +214,7 @@ async function getOrderById(req, res) {
             { razorpayOrderId: id },
             { razorpayPaymentId: id }
           ]
-        }).lean();
+        }).populate("giftId").lean();
       }
 
       if (orderDoc) {
@@ -242,7 +248,7 @@ async function searchOrders(req, res) {
           { razorpayOrderId: regex },
           { razorpayPaymentId: regex }
         ]
-      }).sort({ createdAt: -1 }).lean();
+      }).sort({ createdAt: -1 }).populate("giftId").lean();
 
       dbOrders = docs.map(sanitizeOrder);
     }

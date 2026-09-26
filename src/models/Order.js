@@ -36,6 +36,11 @@ const OrderSchema = new Schema(
     razorpayPaymentId: { type: String, default: "" },
     razorpaySignature: { type: String, default: "" },
     notes: { type: String, default: "" },
+    giftId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Gift",
+      default: null,
+    },
   },
   {
     timestamps: true,

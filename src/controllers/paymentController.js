@@ -18,6 +18,7 @@ function sanitizeOrder(doc) {
     razorpayOrderId: doc.razorpayOrderId || "",
     razorpayPaymentId: doc.razorpayPaymentId || "",
     notes: doc.notes || "",
+    giftId: doc.giftId || null,
     createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : new Date().toISOString(),
   };
 }
@@ -101,6 +102,7 @@ async function verifyRazorpayPayment(req, res) {
       items,
       totalAmount,
       notes,
+      giftId,
     } = req.body;
 
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
@@ -155,6 +157,7 @@ async function verifyRazorpayPayment(req, res) {
       razorpayPaymentId: razorpay_payment_id,
       razorpaySignature: razorpay_signature,
       notes: notes || "Paid online via Official Razorpay Gateway",
+      ...(giftId ? { giftId } : {}),
     });
 
     return res.status(200).json({
