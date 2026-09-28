@@ -4,6 +4,9 @@ const bcrypt = require("bcryptjs");
 const { generateToken, verifyToken } = require("../middleware/authMiddleware");
 const { sendResetOtpEmail } = require("../utils/sendEmail");
 
+const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
+const passwordErrorMessage = "Password must be at least 8 characters long, include an uppercase letter, a lowercase letter, a number, and a special character.";
+
 function sanitizeUser(user, token) {
   return {
     id: user._id ? user._id.toString() : user.id,
@@ -21,6 +24,10 @@ async function register(req, res) {
     const { name, email, password, phone } = req.body;
     if (!name || !email || !password) {
       return res.status(400).json({ success: false, error: "Name, email and password are required" });
+    }
+
+    if (!passwordRegex.test(password)) {
+      return res.status(400).json({ success: false, error: passwordErrorMessage });
     }
 
     const conn = await connectToDatabase();
@@ -179,8 +186,8 @@ async function updateProfile(req, res) {
         return res.status(400).json({ success: false, error: "Current password is incorrect" });
       }
 
-      if (newPassword.length < 6) {
-        return res.status(400).json({ success: false, error: "New password must be at least 6 characters long" });
+      if (!passwordRegex.test(newPassword)) {
+        return res.status(400).json({ success: false, error: passwordErrorMessage });
       }
 
       const salt = await bcrypt.genSalt(10);
@@ -252,8 +259,8 @@ async function resetPassword(req, res) {
       return res.status(400).json({ success: false, error: "Email, OTP code and new password are required" });
     }
 
-    if (newPassword.length < 6) {
-      return res.status(400).json({ success: false, error: "New password must be at least 6 characters long" });
+    if (!passwordRegex.test(newPassword)) {
+      return res.status(400).json({ success: false, error: passwordErrorMessage });
     }
 
     const conn = await connectToDatabase();
