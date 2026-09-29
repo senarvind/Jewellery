@@ -68,9 +68,14 @@ app.get("/", (req, res) => {
 // Start Server
 async function startServer() {
   await connectToDatabase();
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`🚀 Keshar Jewellers Backend Server running on http://localhost:${PORT}`);
   });
+
+  // Fix for Next.js API proxy 'socket hang up' (ECONNRESET) errors
+  // Next.js native fetch keeps connections alive longer than Express's default 5s
+  server.keepAliveTimeout = 120000; // 120 seconds
+  server.headersTimeout = 120500; // slightly higher than keepAliveTimeout
 }
 
 startServer();

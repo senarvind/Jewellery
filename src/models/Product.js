@@ -13,6 +13,7 @@ const ProductSchema = new Schema(
     weight:       { type: String, required: true },
     sellingPrice: { type: Number, required: true },
     mrp:          { type: Number, required: true },
+    stock:        { type: Number, default: 0 },
     frontImage:   { type: String, default: "" },
     backImage:    { type: String, default: "" },
     modelImage:   { type: String, default: "" },

@@ -7,12 +7,14 @@ const {
   createOrder,
   updateOrderStatus,
   deleteOrder,
+  requestExchange,
 } = require("../controllers/orderController");
 
 router.get("/", getAllOrders);
 router.get("/search", searchOrders);
 router.get("/:id", getOrderById);
 router.post("/", createOrder);
+router.post("/:id/exchange/:productId", requestExchange);
 router.put("/:id", updateOrderStatus);
 router.put("/", updateOrderStatus);
 router.delete("/:id", deleteOrder);

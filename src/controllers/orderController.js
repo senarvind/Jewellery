@@ -1,5 +1,6 @@
 const connectToDatabase = require("../config/db");
 const OrderModel = require("../models/Order");
+const { uploadBase64ToCloudinary } = require("../config/cloudinary");
 
 function sanitizeOrder(doc) {
   return {
@@ -19,6 +20,13 @@ function sanitizeOrder(doc) {
       image: doc.giftId.image
     } : null,
     createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : new Date().toISOString(),
+    items: doc.items ? doc.items.map(item => ({
+      ...item,
+      isExchangeRequested: item.isExchangeRequested || false,
+      exchangeReason: item.exchangeReason || "",
+      exchangePhoto: item.exchangePhoto || "",
+      exchangeStatus: item.exchangeStatus || "none"
+    })) : [],
   };
 }
 
@@ -260,6 +268,64 @@ async function searchOrders(req, res) {
   }
 }
 
+async function requestExchange(req, res) {
+  try {
+    const { id, productId } = req.params;
+    const { reason, photoUrl } = req.body;
+
+    if (!reason) {
+      return res.status(400).json({ success: false, error: "Exchange reason is required" });
+    }
+
+    const conn = await connectToDatabase();
+    if (!conn) {
+      return res.status(500).json({ success: false, error: "Database connection failed" });
+    }
+
+    const order = await OrderModel.findById(id);
+    if (!order) {
+      return res.status(404).json({ success: false, error: "Order not found" });
+    }
+
+    if (order.status !== 'delivered') {
+      return res.status(400).json({ success: false, error: "Can only exchange delivered items" });
+    }
+
+    // Since productId is not strictly unique if they bought the same item twice, 
+    // we use productName as a fallback or just update the matching one.
+    // OrderItemSchema has `productName` and `productId`.
+    const itemIndex = order.items.findIndex(
+      (item) => item.productId === productId || item.productName === productId
+    );
+
+    if (itemIndex === -1) {
+      return res.status(404).json({ success: false, error: "Product not found in this order" });
+    }
+
+    let finalPhotoUrl = photoUrl || "";
+    if (finalPhotoUrl.startsWith("data:image")) {
+      try {
+        finalPhotoUrl = await uploadBase64ToCloudinary(finalPhotoUrl, "exchanges");
+      } catch (err) {
+        console.error("Cloudinary upload failed for exchange request:", err);
+        // Fallback to storing base64 or throwing error depending on requirement
+        // We'll throw an error if Cloudinary is strongly required
+      }
+    }
+
+    order.items[itemIndex].isExchangeRequested = true;
+    order.items[itemIndex].exchangeReason = reason;
+    order.items[itemIndex].exchangePhoto = finalPhotoUrl;
+    order.items[itemIndex].exchangeStatus = "pending";
+
+    await order.save();
+    return res.json({ success: true, message: "Exchange requested successfully", order: sanitizeOrder(order) });
+  } catch (error) {
+    console.error("Error in requestExchange:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+}
+
 module.exports = {
   getAllOrders,
   getOrderById,
@@ -267,4 +333,5 @@ module.exports = {
   createOrder,
   updateOrderStatus,
   deleteOrder,
+  requestExchange,
 };

@@ -8,6 +8,10 @@ const OrderItemSchema = new Schema(
     category:    { type: String, default: "" },
     quantity:    { type: Number, default: 1 },
     price:       { type: Number, required: true },
+    isExchangeRequested: { type: Boolean, default: false },
+    exchangeReason: { type: String, default: "" },
+    exchangePhoto: { type: String, default: "" },
+    exchangeStatus: { type: String, enum: ["pending", "approved", "rejected", "none"], default: "none" },
   },
   { _id: false }
 );
