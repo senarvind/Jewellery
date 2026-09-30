@@ -30,57 +30,7 @@ function sanitizeOrder(doc) {
   };
 }
 
-const INITIAL_SEED_ORDERS = [
-  {
-    customerName: "Priya Sharma",
-    customerPhone: "+91 98765 43210",
-    customerEmail: "priya.sharma@example.com",
-    customerAddress: "45 MG Road, Indiranagar, Bengaluru, Karnataka",
-    items: [
-      { productName: "22K Gold Bridal Necklace", category: "necklaces", quantity: 1, price: 125000 },
-      { productName: "Gold Antique Jhumka", category: "earrings", quantity: 1, price: 45000 },
-    ],
-    totalAmount: 170000,
-    status: "pending",
-    notes: "Express gift packing requested",
-  },
-  {
-    customerName: "Rajesh Kumar Patel",
-    customerPhone: "+91 98234 56789",
-    customerEmail: "rajesh.patel@example.com",
-    customerAddress: "12 Ring Road, Satellite, Ahmedabad, Gujarat",
-    items: [
-      { productName: "925 Sterling Silver Kada", category: "bangles", quantity: 2, price: 8500 },
-    ],
-    totalAmount: 17000,
-    status: "confirmed",
-    notes: "Call before delivery",
-  },
-  {
-    customerName: "Ananya Roy",
-    customerPhone: "+91 97112 34567",
-    customerEmail: "ananya.roy@example.com",
-    customerAddress: "78 Park Street, Kolkata, West Bengal",
-    items: [
-      { productName: "Solitaire Diamond Engagement Ring", category: "rings", quantity: 1, price: 89000 },
-    ],
-    totalAmount: 89000,
-    status: "shipped",
-    notes: "Shipped via BlueDart Insured Courier",
-  },
-  {
-    customerName: "Vikramaditya Singh",
-    customerPhone: "+91 99887 76655",
-    customerEmail: "vikram.singh@example.com",
-    customerAddress: "102 Royal Palm Drive, Jaipur, Rajasthan",
-    items: [
-      { productName: "Royal Kundan Choker Set", category: "necklaces", quantity: 1, price: 145000 },
-    ],
-    totalAmount: 145000,
-    status: "delivered",
-    notes: "Delivered & verified hallmark certificate",
-  },
-];
+
 
 async function getAllOrders(req, res) {
   try {
@@ -89,16 +39,6 @@ async function getAllOrders(req, res) {
     if (conn) {
       let docs = await OrderModel.find({}).sort({ createdAt: -1 }).populate("giftId").lean();
       
-      // Auto-seed if database orders collection is empty
-      if (docs.length === 0) {
-        try {
-          await OrderModel.insertMany(INITIAL_SEED_ORDERS);
-          docs = await OrderModel.find({}).sort({ createdAt: -1 }).populate("giftId").lean();
-        } catch (seedErr) {
-          console.warn("Failed to seed initial orders:", seedErr);
-        }
-      }
-
       dbOrders = docs.map(sanitizeOrder);
     }
 
