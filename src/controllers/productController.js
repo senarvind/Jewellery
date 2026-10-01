@@ -1,8 +1,9 @@
 const mongoose = require("mongoose");
 const connectToDatabase = require("../config/db");
 const ProductModel = require("../models/Product");
+const WishlistModel = require("../models/Wishlist");
+const CartModel = require("../models/Cart");
 const { uploadBase64ToCloudinary } = require("../config/cloudinary");
-
 
 function toProduct(doc) {
   return {
@@ -276,6 +277,41 @@ async function deleteProduct(req, res) {
     const deleted = await ProductModel.findByIdAndDelete(id);
     if (!deleted) {
       return res.status(404).json({ success: false, error: "Product not found" });
+    }
+
+    // Remove the deleted product from all user wishlists and carts
+    try {
+      let objectId;
+      try {
+        objectId = new mongoose.Types.ObjectId(id);
+      } catch (e) {
+        objectId = null;
+      }
+      
+      const orConditions = [
+        { productId: id },
+        { "product.id": id },
+        { "product.id": String(id) },
+        { "product._id": id },
+        { "product._id": String(id) }
+      ];
+      if (objectId) {
+        orConditions.push({ "product._id": objectId });
+      }
+
+      const pullQuery = { 
+        $pull: { 
+          items: { 
+            $or: orConditions
+          } 
+        } 
+      };
+      await Promise.all([
+        WishlistModel.updateMany({}, pullQuery),
+        CartModel.updateMany({}, pullQuery)
+      ]);
+    } catch (cleanupError) {
+      console.error("Failed to remove product from wishlists or carts:", cleanupError);
     }
 
     return res.json({ success: true, message: "Product deleted successfully" });
