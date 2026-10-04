@@ -11,6 +11,7 @@ const ProductSchema = new Schema(
     dimensionW:   { type: String, default: "" },
     dimensionH:   { type: String, default: "" },
     weight:       { type: String, required: true },
+    ankletType:   { type: String, enum: ["Single", "Pair", ""], default: "" },
     sellingPrice: { type: Number, required: true },
     mrp:          { type: Number, required: true },
     stock:        { type: Number, default: 0 },
