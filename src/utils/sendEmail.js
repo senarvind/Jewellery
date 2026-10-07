@@ -10,6 +10,7 @@ require("dotenv").config();
 async function sendResetOtpEmail(toEmail, otpCode, userName = "Valued Customer") {
   const emailUser = process.env.EMAIL_USER;
   const emailPass = process.env.EMAIL_PASS;
+  const isProduction = process.env.NODE_ENV === "production";
 
   // Always log OTP in server console for local dev convenience & testing
   console.log(`\n==================================================`);
@@ -19,8 +20,16 @@ async function sendResetOtpEmail(toEmail, otpCode, userName = "Valued Customer")
 
   if (!emailUser || !emailPass) {
     console.log("ℹ️ EMAIL_USER or EMAIL_PASS not configured in backend/.env.");
-    console.log("🌐 Using Ethereal Email for dynamic testing...");
     
+    // In production, we must fail if there are no email credentials, otherwise users wait for emails that never arrive.
+    if (isProduction) {
+      return { 
+        success: false, 
+        error: "Email service is not configured on the server. Please contact support." 
+      };
+    }
+
+    console.log("🌐 Using Ethereal Email for dynamic testing...");
     try {
       const testAccount = await nodemailer.createTestAccount();
       const transporter = nodemailer.createTransport({
@@ -117,8 +126,7 @@ async function sendResetOtpEmail(toEmail, otpCode, userName = "Valued Customer")
     return { success: true, mode: "gmail" };
   } catch (error) {
     console.error("❌ Failed to send email via Gmail transporter:", error.message);
-    // Still return success so user flow is not broken if server console log is available
-    return { success: true, mode: "fallback", error: error.message };
+    return { success: false, mode: "fallback", error: error.message };
   }
 }
 

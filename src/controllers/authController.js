@@ -241,7 +241,14 @@ async function forgotPassword(req, res) {
     await user.save();
 
     // Send Email
-    await sendResetOtpEmail(user.email, otp, user.name);
+    const emailResult = await sendResetOtpEmail(user.email, otp, user.name);
+
+    if (!emailResult.success) {
+      return res.status(500).json({ 
+        success: false, 
+        error: "Failed to send reset email. Please try again later." 
+      });
+    }
 
     return res.json({
       success: true,
