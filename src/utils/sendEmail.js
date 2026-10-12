@@ -36,6 +36,33 @@ function getResetEmailHtml(otpCode, userName = "Valued Customer") {
   `;
 }
 
+let cachedBrevoSender = null;
+
+async function getBrevoSender(apiKey) {
+  if (process.env.BREVO_SENDER_EMAIL) {
+    return process.env.BREVO_SENDER_EMAIL.trim();
+  }
+  if (cachedBrevoSender) {
+    return cachedBrevoSender;
+  }
+  try {
+    const res = await fetch("https://api.brevo.com/v3/senders", {
+      headers: { "api-key": apiKey.trim() },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const activeSender = data.senders?.find((s) => s.active);
+      if (activeSender?.email) {
+        cachedBrevoSender = activeSender.email;
+        return cachedBrevoSender;
+      }
+    }
+  } catch (err) {
+    // Fall back to known default verified sender
+  }
+  return "arvindsen1075@gmail.com";
+}
+
 /**
  * Sends email via Brevo REST API (HTTPS port 443 - Works on Render Free Tier!)
  */
@@ -43,7 +70,7 @@ async function sendViaBrevo(toEmail, otpCode, userName) {
   const apiKey = process.env.BREVO_API_KEY;
   if (!apiKey) return null;
 
-  const senderEmail = process.env.BREVO_SENDER_EMAIL || process.env.EMAIL_USER || "kesharjewellers2003@gmail.com";
+  const senderEmail = await getBrevoSender(apiKey);
   const htmlContent = getResetEmailHtml(otpCode, userName);
 
   try {
@@ -55,7 +82,8 @@ async function sendViaBrevo(toEmail, otpCode, userName) {
         "Accept": "application/json",
       },
       body: JSON.stringify({
-        sender: { name: "Keshar Jewellers Support", email: senderEmail },
+        sender: { name: "Keshar Jewellers", email: senderEmail },
+        replyTo: { name: "Keshar Jewellers Support", email: "kesharjewellers2003@gmail.com" },
         to: [{ email: toEmail, name: userName }],
         subject: "✦ Keshar Jewellers - Password Reset OTP Code",
         htmlContent,
@@ -64,7 +92,7 @@ async function sendViaBrevo(toEmail, otpCode, userName) {
 
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
-      console.log(`✅ Reset OTP Email sent via Brevo HTTPS API to ${toEmail}`);
+      console.log(`✅ Reset OTP Email sent via Brevo HTTPS API to ${toEmail} (Sender: ${senderEmail})`);
       return { success: true, mode: "brevo" };
     }
     console.error("❌ Brevo API error:", data);
@@ -142,13 +170,15 @@ async function sendResetOtpEmail(toEmail, otpCode, userName = "Valued Customer")
   // 1. Try Brevo HTTPS API if configured
   if (process.env.BREVO_API_KEY) {
     const brevoResult = await sendViaBrevo(toEmail, otpCode, userName);
-    if (brevoResult) return brevoResult;
+    if (brevoResult && brevoResult.success) return brevoResult;
+    console.warn("⚠️ Brevo sending failed or rejected, trying fallbacks...");
   }
 
   // 2. Try Resend HTTPS API if configured
   if (process.env.RESEND_API_KEY) {
     const resendResult = await sendViaResend(toEmail, otpCode, userName);
-    if (resendResult) return resendResult;
+    if (resendResult && resendResult.success) return resendResult;
+    console.warn("⚠️ Resend sending failed or rejected, trying fallbacks...");
   }
 
   // 3. Fallback to Gmail SMTP (Localhost or Paid Render)
