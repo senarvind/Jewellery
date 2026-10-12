@@ -82,17 +82,32 @@ async function sendResetOtpEmail(toEmail, otpCode, userName = "Valued Customer")
     }
   }
 
+const dns = require("dns");
+try {
+  dns.setDefaultResultOrder("ipv4first");
+} catch (e) {
+  // Fallback for older Node runtimes
+}
+
   try {
     const cleanPass = emailPass.replace(/\s+/g, "");
     const cleanUser = emailUser.trim();
 
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: cleanUser,
-        pass: cleanPass,
-      },
-    });
+    const createGmailTransporter = (port, secure) => {
+      return nodemailer.createTransport({
+        host: "smtp.gmail.com",
+        port,
+        secure,
+        family: 4, // Force IPv4 to prevent ENETUNREACH on cloud hosts like Render
+        auth: {
+          user: cleanUser,
+          pass: cleanPass,
+        },
+        connectionTimeout: 12000,
+        greetingTimeout: 10000,
+        socketTimeout: 15000,
+      });
+    };
 
     const mailOptions = {
       from: `"Keshar Jewellers Support" <${cleanUser}>`,
@@ -122,9 +137,18 @@ async function sendResetOtpEmail(toEmail, otpCode, userName = "Valued Customer")
       `,
     };
 
-    await transporter.sendMail(mailOptions);
-    console.log(`✅ Reset OTP Email successfully sent via Gmail to ${toEmail}`);
-    return { success: true, mode: "gmail" };
+    try {
+      const transporter465 = createGmailTransporter(465, true);
+      await transporter465.sendMail(mailOptions);
+      console.log(`✅ Reset OTP Email successfully sent via Gmail (port 465) to ${toEmail}`);
+      return { success: true, mode: "gmail-465" };
+    } catch (primaryErr) {
+      console.warn(`⚠️ Port 465 failed (${primaryErr.message}), falling back to port 587...`);
+      const transporter587 = createGmailTransporter(587, false);
+      await transporter587.sendMail(mailOptions);
+      console.log(`✅ Reset OTP Email successfully sent via Gmail (port 587) to ${toEmail}`);
+      return { success: true, mode: "gmail-587" };
+    }
   } catch (error) {
     console.error("❌ Failed to send email via Gmail transporter:", error.message);
     return { success: false, mode: "fallback", error: error.message };

@@ -2,6 +2,10 @@ const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const path = require("path");
+const dns = require("dns");
+try {
+  dns.setDefaultResultOrder("ipv4first");
+} catch (e) {}
 const connectToDatabase = require("./config/db");
 
 const healthRoutes = require("./routes/healthRoutes");
