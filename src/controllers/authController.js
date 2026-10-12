@@ -246,7 +246,7 @@ async function forgotPassword(req, res) {
     if (!emailResult.success) {
       return res.status(500).json({ 
         success: false, 
-        error: "Failed to send reset email. Please try again later." 
+        error: emailResult.error || "Failed to send reset email. Please try again later." 
       });
     }
 

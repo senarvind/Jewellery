@@ -83,18 +83,19 @@ async function sendResetOtpEmail(toEmail, otpCode, userName = "Valued Customer")
   }
 
   try {
+    const cleanPass = emailPass.replace(/\s+/g, "");
+    const cleanUser = emailUser.trim();
+
     const transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 465,
-      secure: true,
+      service: "gmail",
       auth: {
-        user: emailUser,
-        pass: emailPass,
+        user: cleanUser,
+        pass: cleanPass,
       },
     });
 
     const mailOptions = {
-      from: `"Keshar Jewellers Support" <${emailUser}>`,
+      from: `"Keshar Jewellers Support" <${cleanUser}>`,
       to: toEmail,
       subject: "✦ Keshar Jewellers - Password Reset OTP Code",
       html: `

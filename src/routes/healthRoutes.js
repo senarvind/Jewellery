@@ -16,6 +16,10 @@ router.get("/", (req, res) => {
       status: dbStatus,
       readyState: dbState,
     },
+    emailService: {
+      configured: Boolean(process.env.EMAIL_USER && process.env.EMAIL_PASS),
+      user: process.env.EMAIL_USER ? `${process.env.EMAIL_USER.slice(0, 4)}***@gmail.com` : null,
+    },
   });
 });
 
