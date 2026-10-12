@@ -17,7 +17,8 @@ router.get("/", (req, res) => {
       readyState: dbState,
     },
     emailService: {
-      configured: Boolean(process.env.EMAIL_USER && process.env.EMAIL_PASS),
+      provider: process.env.BREVO_API_KEY ? "brevo_https" : process.env.RESEND_API_KEY ? "resend_https" : (process.env.EMAIL_USER && process.env.EMAIL_PASS) ? "gmail_smtp" : "none",
+      configured: Boolean(process.env.BREVO_API_KEY || process.env.RESEND_API_KEY || (process.env.EMAIL_USER && process.env.EMAIL_PASS)),
       user: process.env.EMAIL_USER ? `${process.env.EMAIL_USER.slice(0, 4)}***@gmail.com` : null,
     },
   });
