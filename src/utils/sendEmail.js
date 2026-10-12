@@ -83,25 +83,35 @@ async function sendResetOtpEmail(toEmail, otpCode, userName = "Valued Customer")
   }
 
 const dns = require("dns");
-try {
-  dns.setDefaultResultOrder("ipv4first");
-} catch (e) {
-  // Fallback for older Node runtimes
+
+function getGmailIpv4() {
+  return new Promise((resolve) => {
+    dns.lookup("smtp.gmail.com", { family: 4 }, (err, address) => {
+      if (err || !address) {
+        resolve("smtp.gmail.com");
+      } else {
+        resolve(address);
+      }
+    });
+  });
 }
 
   try {
     const cleanPass = emailPass.replace(/\s+/g, "");
     const cleanUser = emailUser.trim();
+    const smtpHost = await getGmailIpv4();
 
     const createGmailTransporter = (port, secure) => {
       return nodemailer.createTransport({
-        host: "smtp.gmail.com",
+        host: smtpHost,
         port,
         secure,
-        family: 4, // Force IPv4 to prevent ENETUNREACH on cloud hosts like Render
         auth: {
           user: cleanUser,
           pass: cleanPass,
+        },
+        tls: {
+          servername: "smtp.gmail.com",
         },
         connectionTimeout: 12000,
         greetingTimeout: 10000,
